@@ -311,75 +311,14 @@ body {
   gap: 8px;
 }
 
-.edit-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 4px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.edit-button:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.edit-form {
-  margin-top: 1rem;
-  padding: 1rem;
-  border-top: 1px solid #eee;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.edit-textarea {
-  width: 100%;
-  min-height: 80px;
-  padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  font-family: inherit;
-  font-size: 0.9rem;
-  resize: vertical;
-  background-color: white;
-}
-
-.edit-buttons {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
+/* Eliminar estilos de edición */
+.edit-button,
+.edit-form,
+.edit-textarea,
+.edit-buttons,
 .save-button,
 .cancel-button {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.save-button {
-  background-color: #4b3ec2;
-  color: white;
-}
-
-.save-button:hover {
-  background-color: #2f239e;
-}
-
-.cancel-button {
-  background-color: #f5f5f5;
-  color: #666;
-}
-
-.cancel-button:hover {
-  background-color: #e0e0e0;
+  display: none;
 }
 
 .checklist {

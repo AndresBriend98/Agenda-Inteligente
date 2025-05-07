@@ -1,9 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 function TaskCard({ task, onStatusChange }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editMessage, setEditMessage] = useState('');
-
   const formatDate = (dateString) => {
     if (!dateString) return 'Sin fecha';
     const date = new Date(dateString);
@@ -51,36 +48,6 @@ function TaskCard({ task, onStatusChange }) {
     
     const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[index % colors.length];
-  };
-
-  const handleEdit = async (e) => {
-    e.preventDefault();
-    if (!editMessage.trim()) return;
-
-    try {
-      const response = await fetch(`http://localhost:5000/api/process-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: editMessage,
-          taskId: task._id
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al actualizar la tarea');
-      }
-
-      const updatedTask = await response.json();
-      onStatusChange(updatedTask);
-      setIsEditing(false);
-      setEditMessage('');
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Error al actualizar la tarea');
-    }
   };
 
   const handleChecklistItemToggle = async (itemText) => {
@@ -135,13 +102,6 @@ function TaskCard({ task, onStatusChange }) {
         <h3>{task.title}</h3>
         <div className="card-actions">
           <span className="task-priority">{task.priority}</span>
-          <button 
-            className="edit-button"
-            onClick={() => setIsEditing(!isEditing)}
-            title="Editar tarea"
-          >
-            ✏️
-          </button>
         </div>
       </div>
       <div className="card-body">
@@ -200,31 +160,6 @@ function TaskCard({ task, onStatusChange }) {
             </div>
           ))}
         </div>
-        {isEditing && (
-          <form onSubmit={handleEdit} className="edit-form">
-            <textarea
-              value={editMessage}
-              onChange={(e) => setEditMessage(e.target.value)}
-              placeholder="Escribe los cambios que quieres hacer..."
-              className="edit-textarea"
-            />
-            <div className="edit-buttons">
-              <button type="submit" className="save-button">
-                Guardar
-              </button>
-              <button 
-                type="button" 
-                className="cancel-button"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditMessage('');
-                }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        )}
       </div>
     </div>
   );

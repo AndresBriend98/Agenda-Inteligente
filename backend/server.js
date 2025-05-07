@@ -417,7 +417,7 @@ async function processMessageWithAI(message, existingTask = null) {
          Responde SOLO con el objeto JSON.`;
 
     const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/chatgpt-4o-latest',
+      model: 'openai/gpt-3.5-turbo',
       messages: [
         {
           role: 'system',
@@ -433,7 +433,7 @@ async function processMessageWithAI(message, existingTask = null) {
         }
       ],
       temperature: 0.1,
-      max_tokens: 800,
+      max_tokens: 300,
       top_p: 0.95,
       frequency_penalty: 0.2,
       presence_penalty: 0.2
@@ -449,27 +449,54 @@ async function processMessageWithAI(message, existingTask = null) {
     console.log('Respuesta completa de la API:', JSON.stringify(response.data, null, 2));
 
     if (!response.data) {
+      console.error('Respuesta de la API vacía:', response);
       throw new Error('La respuesta de la API está vacía');
     }
 
-    if (!response.data.choices) {
-      throw new Error('La respuesta no contiene choices');
+    // Verificar si hay un error en la respuesta
+    if (response.data.error) {
+      console.error('Error de la API:', response.data.error);
+      if (response.data.error.code === 402) {
+        throw new Error('Error de créditos: No hay suficientes créditos disponibles en la cuenta de OpenRouter. Por favor, actualiza tu plan o reduce el número de tokens.');
+    }
+      throw new Error(`Error de la API: ${response.data.error.message || response.data.error}`);
     }
 
-    if (!response.data.choices[0]) {
-      throw new Error('No hay choices en la respuesta');
+    let responseText;
+    
+    // Intentar diferentes formatos de respuesta
+    if (response.data.choices && response.data.choices[0] && response.data.choices[0].message) {
+      responseText = response.data.choices[0].message.content;
+    } else if (response.data.message) {
+      responseText = response.data.message;
+    } else if (response.data.content) {
+      responseText = response.data.content;
+    } else if (response.data.text) {
+      responseText = response.data.text;
+    } else if (typeof response.data === 'string') {
+      responseText = response.data;
+    } else if (response.data.response) {
+      responseText = response.data.response;
+    } else if (response.data.result) {
+      responseText = response.data.result;
+    } else {
+      console.error('Formato de respuesta no reconocido:', response.data);
+      console.error('Estructura de la respuesta:', Object.keys(response.data));
+      throw new Error('Formato de respuesta no reconocido de la API');
     }
 
-    if (!response.data.choices[0].message) {
-      throw new Error('No hay mensaje en la respuesta');
-    }
+    console.log('Texto extraído de la respuesta:', responseText);
 
-    const responseText = response.data.choices[0].message.content;
-    console.log('Respuesta de IA:', responseText);
+    // Si la respuesta es un string vacío o undefined
+    if (!responseText) {
+      console.error('Respuesta vacía o undefined');
+      throw new Error('La API devolvió una respuesta vacía');
+    }
 
     // Extraer el JSON de la respuesta
     const jsonMatch = responseText.match(isModification ? /\{[\s\S]*\}/ : /\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error('No se pudo extraer JSON de la respuesta:', responseText);
       throw new Error('No se pudo extraer la información de la respuesta de IA');
     }
 
@@ -483,6 +510,7 @@ async function processMessageWithAI(message, existingTask = null) {
         .replace(/,\s*]/g, ']')
         .trim();
 
+      console.log('JSON limpio a parsear:', cleanJson);
       data = JSON.parse(cleanJson);
       console.log('JSON parseado:', data);
 
@@ -718,20 +746,6 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
-// Actualizar una tarea
-app.put('/api/tasks/:id', async (req, res) => {
-  try {
-    const updatedTask = await Task.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-    res.json(updatedTask);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al actualizar la tarea' });
-  }
-});
-
 // Eliminar una tarea
 app.delete('/api/tasks/:id', async (req, res) => {
   try {
@@ -841,6 +855,57 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/task-mana
   .catch(err => {
     console.error('Error de conexión a MongoDB:', err);
     process.exit(1);
+});
+
+// Función para probar la conexión con la API
+async function testOpenRouterConnection() {
+  try {
+    const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+      model: 'openai/gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: 'Hola, ¿cómo estás?'
+        }
+      ],
+      max_tokens: 100
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:5000',
+        'X-Title': 'Task Manager'
+      }
+    });
+
+    console.log('Prueba de conexión exitosa:', response.data);
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error('Error en prueba de conexión:', error.response?.data || error.message);
+    return { 
+      success: false, 
+      error: error.response?.data || error.message,
+      status: error.response?.status
+    };
+  }
+}
+
+// Ruta para probar la conexión con la API
+app.get('/api/test-connection', async (req, res) => {
+  try {
+    const result = await testOpenRouterConnection();
+    if (result.success) {
+      res.json({ message: 'Conexión exitosa con OpenRouter', data: result.data });
+    } else {
+      res.status(500).json({ 
+        error: 'Error al conectar con OpenRouter', 
+        details: result.error,
+        status: result.status
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Error al probar la conexión', details: error.message });
+  }
 });
 
 // Iniciar el servidor
