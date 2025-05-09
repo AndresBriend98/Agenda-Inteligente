@@ -35,6 +35,15 @@ app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/columns', require('./routes/columnRoutes'));
 
+const expertSystemRoutes = require('./routes/expertSystemRoutes');
+
+// Rutas
+app.use('/api/knowledge', require('./routes/knowledgeBaseRoutes'));
+app.use('/api/ai', require('./routes/aiRoutes'));
+app.use('/api/tasks', require('./routes/taskRoutes'));
+app.use('/api/columns', require('./routes/columnRoutes'));
+app.use('/api/expert', expertSystemRoutes);
+
 // Manejo de errores
 app.use((err, req, res, next) => {
     console.error(err.stack);

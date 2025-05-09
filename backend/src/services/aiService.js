@@ -4,6 +4,7 @@ const { processSymptom, validateEnvironment, checkAvailableMeans, processPercept
 const { applyRules } = require('./rules');
 const Column = require('../models/Column');
 const Task = require('../models/Task');
+const Member = require('../models/Member');
 
 // Configuración de la API
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -64,8 +65,8 @@ async function detectIntent(message) {
 
 IMPORTANTE:
 - Si el mensaje dice "cambiar el título de la tarea X por Y", interpretarlo como MODIFY con type: "task"
-- Si el mensaje dice "cambiar el título de la columna X por Y", interpretarlo como MODIFY con type: "column"
-- Si el mensaje dice "cambiar el título de X por Y" y X es una tarea existente, interpretarlo como MODIFY con type: "task"
+- Si el mensaje dice "cambiar el título de la columna X por Y", interpretarlo como MODIFY with type: "column"
+- Si el mensaje dice "cambiar el título de X por Y" y X es una tarea existente, interpretarlo como MODIFY with type: "task"
 - Si el mensaje dice "cambiar el título de X por Y" y X es una columna existente, interpretarlo como MODIFY with type: "column"
 - Para fechas, devolver el texto exacto de la fecha mencionada (ej: "9 de este mes", "10 de mayo", "mañana")
 - Captura el nombre COMPLETO del elemento, incluyendo palabras descriptivas
@@ -203,6 +204,54 @@ async function processMessageWithAI(message) {
                 // Buscar la tarea existente
                 const task = await findTask(intent.name);
                 
+                // Si se está agregando un miembro
+                if (intent.details.addMember) {
+                    // Buscar el miembro por nombre
+                    const member = await Member.findOne({ 
+                        name: { $regex: new RegExp(intent.details.addMember, 'i') }
+                    });
+                    
+                    if (!member) {
+                        throw new Error(`No se encontró el miembro "${intent.details.addMember}"`);
+                    }
+
+                    // Agregar el miembro a la tarea
+                    if (!task.assignedTo.includes(member._id)) {
+                        task.assignedTo.push(member._id);
+                        await task.save();
+                    }
+
+                    return [{
+                        type: 'task',
+                        action: 'modified',
+                        data: await Task.findById(task._id).populate('assignedTo'),
+                        message: `Miembro "${member.name}" agregado a la tarea "${task.title}"`
+                    }];
+                }
+
+                // Si se está removiendo un miembro
+                if (intent.details.removeMember) {
+                    // Buscar el miembro por nombre
+                    const member = await Member.findOne({ 
+                        name: { $regex: new RegExp(intent.details.removeMember, 'i') }
+                    });
+                    
+                    if (!member) {
+                        throw new Error(`No se encontró el miembro "${intent.details.removeMember}"`);
+                    }
+
+                    // Remover el miembro de la tarea
+                    task.assignedTo = task.assignedTo.filter(id => id.toString() !== member._id.toString());
+                    await task.save();
+
+                    return [{
+                        type: 'task',
+                        action: 'modified',
+                        data: await Task.findById(task._id).populate('assignedTo'),
+                        message: `Miembro "${member.name}" removido de la tarea "${task.title}"`
+                    }];
+                }
+
                 // Si se está modificando el título
                 if (intent.details.newName) {
                     // Verificar si el nuevo título ya existe

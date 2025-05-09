@@ -86,11 +86,104 @@ const ResponseHistorySchema = new mongoose.Schema({
     }
 });
 
+// Esquema para tarjetas
+const CardSchema = new mongoose.Schema({
+    title: {
+        type: String,
+        required: true
+    },
+    description: String,
+    column: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Column',
+        required: true
+    },
+    tasks: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Task'
+    }],
+    members: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Member'
+    }],
+    dueDate: Date,
+    priority: {
+        type: String,
+        enum: ['Alta', 'Media', 'Baja'],
+        default: 'Media'
+    },
+    isActive: {
+        type: Boolean,
+        default: true
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
+    }
+});
+
+// Esquema para tareas
+const TaskSchema = new mongoose.Schema({
+    title: {
+        type: String,
+        required: true
+    },
+    description: String,
+    status: {
+        type: String,
+        enum: ['Pendiente', 'En Progreso', 'Completada'],
+        default: 'Pendiente'
+    },
+    assignedTo: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Member'
+    }],
+    dueDate: Date,
+    priority: {
+        type: String,
+        enum: ['Alta', 'Media', 'Baja'],
+        default: 'Media'
+    },
+    isActive: {
+        type: Boolean,
+        default: true
+    }
+});
+
+// Esquema para miembros
+const MemberSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    role: {
+        type: String,
+        enum: ['Admin', 'Usuario', 'Observador'],
+        default: 'Usuario'
+    },
+    isActive: {
+        type: Boolean,
+        default: true
+    }
+});
+
 // Modelos
 const Rule = mongoose.model('Rule', RuleSchema);
 const Fact = mongoose.model('Fact', FactSchema);
 const ResponseTemplate = mongoose.model('ResponseTemplate', ResponseTemplateSchema);
 const ResponseHistory = mongoose.model('ResponseHistory', ResponseHistorySchema);
+const Card = mongoose.model('Card', CardSchema);
+const Task = mongoose.model('Task', TaskSchema);
+const Member = mongoose.model('Member', MemberSchema);
 
 // Sistema de Base de Conocimientos
 class KnowledgeBase {
@@ -230,6 +323,169 @@ class KnowledgeBase {
                                      .sort({ timestamp: -1 });
         } catch (error) {
             console.error('Error al obtener historial:', error);
+            throw error;
+        }
+    }
+
+    // Gestión de Tarjetas
+    async addCard(cardData) {
+        try {
+            const card = new Card(cardData);
+            await card.save();
+            return card;
+        } catch (error) {
+            console.error('Error al agregar tarjeta:', error);
+            throw error;
+        }
+    }
+
+    async updateCard(cardId, updates) {
+        try {
+            const card = await Card.findByIdAndUpdate(
+                cardId,
+                { ...updates, updatedAt: Date.now() },
+                { new: true }
+            );
+            return card;
+        } catch (error) {
+            console.error('Error al actualizar tarjeta:', error);
+            throw error;
+        }
+    }
+
+    async deleteCard(cardId) {
+        try {
+            await Card.findByIdAndUpdate(cardId, { isActive: false });
+            return true;
+        } catch (error) {
+            console.error('Error al eliminar tarjeta:', error);
+            throw error;
+        }
+    }
+
+    // Gestión de Tareas
+    async addTask(taskData) {
+        try {
+            const task = new Task(taskData);
+            await task.save();
+            return task;
+        } catch (error) {
+            console.error('Error al agregar tarea:', error);
+            throw error;
+        }
+    }
+
+    async updateTask(taskId, updates) {
+        try {
+            const task = await Task.findByIdAndUpdate(
+                taskId,
+                updates,
+                { new: true }
+            ).populate('assignedTo');
+            return task;
+        } catch (error) {
+            console.error('Error al actualizar tarea:', error);
+            throw error;
+        }
+    }
+
+    async deleteTask(taskId) {
+        try {
+            await Task.findByIdAndUpdate(taskId, { isActive: false });
+            return true;
+        } catch (error) {
+            console.error('Error al eliminar tarea:', error);
+            throw error;
+        }
+    }
+
+    async addMemberToTask(taskId, memberId) {
+        try {
+            const task = await Task.findById(taskId);
+            if (!task) {
+                throw new Error('Tarea no encontrada');
+            }
+
+            if (!task.assignedTo.includes(memberId)) {
+                task.assignedTo.push(memberId);
+                await task.save();
+            }
+
+            return await Task.findById(taskId).populate('assignedTo');
+        } catch (error) {
+            console.error('Error al agregar miembro a la tarea:', error);
+            throw error;
+        }
+    }
+
+    async removeMemberFromTask(taskId, memberId) {
+        try {
+            const task = await Task.findById(taskId);
+            if (!task) {
+                throw new Error('Tarea no encontrada');
+            }
+
+            task.assignedTo = task.assignedTo.filter(id => id.toString() !== memberId.toString());
+            await task.save();
+
+            return await Task.findById(taskId).populate('assignedTo');
+        } catch (error) {
+            console.error('Error al remover miembro de la tarea:', error);
+            throw error;
+        }
+    }
+
+    // Gestión de Miembros
+    async addMember(memberData) {
+        try {
+            const member = new Member(memberData);
+            await member.save();
+            return member;
+        } catch (error) {
+            console.error('Error al agregar miembro:', error);
+            throw error;
+        }
+    }
+
+    async updateMember(memberId, updates) {
+        try {
+            const member = await Member.findByIdAndUpdate(
+                memberId,
+                updates,
+                { new: true }
+            );
+            return member;
+        } catch (error) {
+            console.error('Error al actualizar miembro:', error);
+            throw error;
+        }
+    }
+
+    async deleteMember(memberId) {
+        try {
+            await Member.findByIdAndUpdate(memberId, { isActive: false });
+            return true;
+        } catch (error) {
+            console.error('Error al eliminar miembro:', error);
+            throw error;
+        }
+    }
+
+    // Procesamiento de comandos del sistema experto
+    async processCommand(command, context) {
+        try {
+            // Analizar el comando
+            const commandAnalysis = await this.analyzeCommand(command);
+            
+            // Aplicar reglas relevantes
+            const applicableRules = await this.getApplicableRules(commandAnalysis);
+            
+            // Ejecutar acciones según las reglas
+            const result = await this.executeActions(applicableRules, context);
+            
+            return result;
+        } catch (error) {
+            console.error('Error al procesar comando:', error);
             throw error;
         }
     }
